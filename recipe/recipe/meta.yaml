@@ -1,6 +1,6 @@
 {% set name = "rosdep" %}
-{% set version = "0.15.2" %}
-{% set sha256 = "8cb8d2df308951bea2824597194e4b34b73a22a05b462e92a6859bc8bdf6ac90" %}
+{% set version = "0.17.1" %}
+{% set sha256 = "4c45a1d0710d8c6f7ce5f55158e076dc95e1b5a83db3cbaea119c2f05d970dd9" %}
 
 package:
   name: {{ name|lower }}
@@ -42,3 +42,4 @@ extra:
   recipe-maintainers:
     - wolfv
     - lesteve
+    - seanyen
