@@ -7,13 +7,15 @@ package:
   version: {{ version }}
 
 source:
-  fn: {{ name }}-{{ version }}.tar.gz
-  url: https://github.com/ros-infrastructure/{{ name }}/archive/{{ version }}.tar.gz
-  sha256: {{ sha256 }}
+  git_url: https://github.com/seanyen/rosdep.git
+  git_rev: conda
 
 build:
   number: 0
   script: {{ PYTHON }} -m pip install . --no-deps -vv
+  entry_points:
+    - rosdep = rosdep2.main:rosdep_main
+    - rosdep-source = rosdep2.install:install_main
 
 requirements:
   host:
