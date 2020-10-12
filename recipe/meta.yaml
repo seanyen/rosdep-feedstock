@@ -14,7 +14,7 @@ source:
     - fix-ros-etc-dir.patch
 
 build:
-  number: 2
+  number: 3
   script: {{ PYTHON }} -m pip install . --no-deps -vv
   entry_points:
     - rosdep = rosdep2.main:rosdep_main
