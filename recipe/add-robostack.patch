@@ -1,0 +1,163 @@
+diff --git a/src/rosdep2/__init__.py b/src/rosdep2/__init__.py
+index 9bb29b63f..2188fb37d 100644
+--- a/src/rosdep2/__init__.py
++++ b/src/rosdep2/__init__.py
+@@ -68,11 +68,12 @@ def create_default_installer_context(verbose=False):
+     from .platforms import npm
+     from .platforms import gem
+     from .platforms import redhat
++    from .platforms import robostack
+     from .platforms import freebsd
+     from .platforms import slackware
+     from .platforms import source
+ 
+-    platform_mods = [alpine, arch, cygwin, debian, gentoo, nix, openembedded, opensuse, osx, redhat, slackware, freebsd]
++    platform_mods = [alpine, arch, cygwin, debian, gentoo, nix, openembedded, opensuse, osx, redhat, robostack, slackware, freebsd]
+     installer_mods = [source, pip, gem, npm] + platform_mods
+ 
+     context = InstallerContext()
+diff --git a/src/rosdep2/gbpdistro_support.py b/src/rosdep2/gbpdistro_support.py
+index fd90ae096..9dd76a76a 100644
+--- a/src/rosdep2/gbpdistro_support.py
++++ b/src/rosdep2/gbpdistro_support.py
+@@ -13,10 +13,12 @@
+ from rospkg.os_detect import OS_FEDORA
+ from rospkg.os_detect import OS_OSX
+ from rospkg.os_detect import OS_UBUNTU
++from rospkg.os_detect import OS_ROBOSTACK
+ 
+ from .core import InvalidData, DownloadFailure
+ from .platforms.debian import APT_INSTALLER
+ from .platforms.osx import BREW_INSTALLER
++from .platforms.robostack import ROBOSTACK_INSTALLER
+ from .platforms.redhat import YUM_INSTALLER
+ from .rosdistrohelper import get_targets, get_release_file, PreRep137Warning
+ 
+@@ -169,6 +171,10 @@ def get_gbprepo_as_rosdep_data(gbpdistro):
+             package_name = 'ros-%s-%s' % (release_name, pkg)
+             package_name = package_name.replace('_', '-')
+ 
++            rosdep_data[pkg][OS_ROBOSTACK] = {
++                ROBOSTACK_INSTALLER: {'packages': [package_name]}
++            }
++
+             for os_name in distro_file.platforms:
+                 if os_name not in rosdep_data[pkg]:
+                     rosdep_data[pkg][os_name] = {}
+diff --git a/src/rosdep2/platforms/robostack.py b/src/rosdep2/platforms/robostack.py
+new file mode 100644
+index 000000000..bf7d4f406
+--- /dev/null
++++ b/src/rosdep2/platforms/robostack.py
+@@ -0,0 +1,98 @@
++# Copyright (c) 2021, Tobias Fischer
++# All rights reserved.
++#
++# Redistribution and use in source and binary forms, with or without
++# modification, are permitted provided that the following conditions are met:
++#
++#     * Redistributions of source code must retain the above copyright
++#       notice, this list of conditions and the following disclaimer.
++#     * Redistributions in binary form must reproduce the above copyright
++#       notice, this list of conditions and the following disclaimer in the
++#       documentation and/or other materials provided with the distribution.
++#     * Neither the name of the Willow Garage, Inc. nor the names of its
++#       contributors may be used to endorse or promote products derived from
++#       this software without specific prior written permission.
++#
++# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
++# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++# POSSIBILITY OF SUCH DAMAGE.
++
++# Author Tobias Fischer/info@tobiasfischer.info
++import subprocess
++
++from rospkg.os_detect import OS_ROBOSTACK
++
++from ..installers import PackageManagerInstaller
++
++ROBOSTACK_INSTALLER = 'robostack'
++
++
++def is_mamba_installed():
++    try:
++        subprocess.Popen(['mamba'], stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
++        return True
++    except OSError:
++        return False
++
++
++def register_installers(context):
++    context.set_installer(ROBOSTACK_INSTALLER, RoboStackInstaller())
++
++
++def register_platforms(context):
++    context.add_os_installer_key(OS_ROBOSTACK, ROBOSTACK_INSTALLER)
++    context.set_default_os_installer_key(OS_ROBOSTACK, lambda self: ROBOSTACK_INSTALLER)
++
++
++def conda_detect(packages):
++    conda_ret = subprocess.check_output(['conda', 'list', '-e', '-q']).splitlines()
++    conda_ret_converted = [s.decode("utf-8") for s in conda_ret]
++    ret_list = []
++    for p in packages:
++        if p == 'REQUIRE_OPENGL' or p == 'REQUIRE_GL':
++            ret_list.append(p)
++            continue
++
++        if ' ' in p:
++            pkg_name = p.split(' ')[0]
++            pkg_version = p.split(' ')[1]
++            if any(conda_ret_converted_item.startswith(pkg_name + '=' + pkg_version + '=') for conda_ret_converted_item in conda_ret_converted):
++                ret_list.append(p)
++        else:
++            if any(conda_ret_converted_item.startswith(p + '=') for conda_ret_converted_item in conda_ret_converted):
++                ret_list.append(p)
++    return ret_list
++
++
++class RoboStackInstaller(PackageManagerInstaller):
++    def __init__(self):
++        super(RoboStackInstaller, self).__init__(conda_detect)
++
++    def get_install_command(self, resolved, interactive=True, reinstall=False, quiet=False):
++        packages = self.get_packages_to_install(resolved, reinstall=reinstall)
++        if not packages:
++            return []
++        if is_mamba_installed:
++            installer_cmd = 'mamba'
++        else:
++            installer_cmd = 'conda'
++        base_cmd = [installer_cmd, 'install']
++        if not interactive:
++            base_cmd.append('-y')
++        if quiet:
++            base_cmd.append('-q')
++        if reinstall:
++            base_cmd.append('--force-reinstall')
++
++        return [base_cmd + packages]
++
++    def get_version_strings(self):
++        return subprocess.check_output(('conda', '--version'))
+diff --git a/src/rosdep2/sources_list.py b/src/rosdep2/sources_list.py
+index bfec3a1d0..c0a91a460 100644
+--- a/src/rosdep2/sources_list.py
++++ b/src/rosdep2/sources_list.py
+@@ -69,7 +69,7 @@
+ 
+ # default file to download with 'init' command in order to bootstrap
+ # rosdep
+-DEFAULT_SOURCES_LIST_URL = 'https://raw.githubusercontent.com/ros/rosdistro/master/rosdep/sources.list.d/20-default.list'
++DEFAULT_SOURCES_LIST_URL = 'https://raw.githubusercontent.com/RoboStack/rosdistro/master/rosdep/sources.list.d/20-default.list'
+ 
+ # seconds to wait before aborting download of rosdep data
+ DOWNLOAD_TIMEOUT = 15.0
