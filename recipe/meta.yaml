@@ -16,14 +16,12 @@ source:
 build:
   number: 0
   script: {{ PYTHON }} -m pip install . --no-deps -vv
+  noarch: python
   entry_points:
     - rosdep = rosdep2.main:rosdep_main
     - rosdep-source = rosdep2.install:install_main
 
 requirements:
-  build:
-    - python                                 # [build_platform != target_platform]
-    - cross-python_{{ target_platform }}     # [build_platform != target_platform]
   host:
     - python
     - pip
