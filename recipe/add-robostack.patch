@@ -50,6 +50,7 @@ index 000000000..bf7d4f406
 --- /dev/null
 +++ b/src/rosdep2/platforms/robostack.py
 @@ -0,0 +1,98 @@
+@@ -0,0 +1,101 @@
 +# Copyright (c) 2021, Tobias Fischer
 +# All rights reserved.
 +#
@@ -116,7 +117,7 @@ index 000000000..bf7d4f406
 +        if ' ' in p:
 +            pkg_name = p.split(' ')[0]
 +            pkg_version = p.split(' ')[1]
-+            if any(conda_ret_converted_item.startswith(pkg_name + '=' + pkg_version + '=') for conda_ret_converted_item in conda_ret_converted):
++            if any(conda_ret_converted_item.startswith(pkg_name + '=' + pkg_version) for conda_ret_converted_item in conda_ret_converted):
 +                ret_list.append(p)
 +        else:
 +            if any(conda_ret_converted_item.startswith(p + '=') for conda_ret_converted_item in conda_ret_converted):
@@ -130,6 +131,8 @@ index 000000000..bf7d4f406
 +
 +    def get_install_command(self, resolved, interactive=True, reinstall=False, quiet=False):
 +        packages = self.get_packages_to_install(resolved, reinstall=reinstall)
++        packages = [p if ' ' not in p else p.replace(' ', '=') for p in packages]
++
 +        if not packages:
 +            return []
 +        if is_mamba_installed:
@@ -148,6 +151,7 @@ index 000000000..bf7d4f406
 +
 +    def get_version_strings(self):
 +        return subprocess.check_output(('conda', '--version'))
++    
 diff --git a/src/rosdep2/sources_list.py b/src/rosdep2/sources_list.py
 index bfec3a1d0..c0a91a460 100644
 --- a/src/rosdep2/sources_list.py
