@@ -156,10 +156,10 @@ index 268fcbdc1..073dac52e 100644
              pass
 diff --git a/src/rosdep2/platforms/robostack.py b/src/rosdep2/platforms/robostack.py
 new file mode 100644
-index 000000000..da007270b
+index 000000000..eba0b4a4c
 --- /dev/null
 +++ b/src/rosdep2/platforms/robostack.py
-@@ -0,0 +1,109 @@
+@@ -0,0 +1,114 @@
 +# Copyright (c) 2021, Tobias Fischer
 +# All rights reserved.
 +#
@@ -258,6 +258,11 @@ index 000000000..da007270b
 +            return []
 +
 +        base_cmd = [get_conda_mamba_cmd(), 'install']
++
++        channels = ['robostack', 'conda-forge']
++        for channel in channels:
++            base_cmd += ['-c', channel]
++
 +        if not interactive:
 +            base_cmd.append('-y')
 +        if quiet:
@@ -296,7 +301,7 @@ index f0cca1396..8dde39155 100644
          fh.close()
          rd_debug('Executing script below with cwd=%s\n{{{\n%s\n}}}\n' % (path, string_script))
 diff --git a/src/rosdep2/sources_list.py b/src/rosdep2/sources_list.py
-index bfec3a1d0..c0a91a460 100644
+index bfec3a1d0..3a4dc3654 100644
 --- a/src/rosdep2/sources_list.py
 +++ b/src/rosdep2/sources_list.py
 @@ -69,7 +69,7 @@
@@ -308,3 +313,17 @@ index bfec3a1d0..c0a91a460 100644
  
  # seconds to wait before aborting download of rosdep data
  DOWNLOAD_TIMEOUT = 15.0
+@@ -97,12 +97,7 @@ def get_sources_list_dirs(source_list_dir):
+ 
+ def get_sources_list_dir():
+     # base of where we read config files from
+-    # TODO: windows
+-    if 0:
+-        # we can't use etc/ros because environment config does not carry over under sudo
+-        etc_ros = rospkg.get_etc_ros_dir()
+-    else:
+-        etc_ros = '/etc/ros'
++    etc_ros = os.environ.get('ROS_ETC_DIR', '/etc/ros')
+     # compute default system wide sources directory
+     sys_sources_list_dir = os.path.join(etc_ros, 'rosdep', SOURCES_LIST_DIR)
+     sources_list_dirs = get_sources_list_dirs(sys_sources_list_dir)
