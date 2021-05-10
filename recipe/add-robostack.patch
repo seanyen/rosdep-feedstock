@@ -16,6 +16,19 @@ index 9bb29b63f..2188fb37d 100644
      installer_mods = [source, pip, gem, npm] + platform_mods
  
      context = InstallerContext()
+diff --git a/src/rosdep2/catkin_support.py b/src/rosdep2/catkin_support.py
+index 4fb3fb3b8..f57b0410a 100644
+--- a/src/rosdep2/catkin_support.py
++++ b/src/rosdep2/catkin_support.py
+@@ -104,7 +104,7 @@ def get_catkin_view(rosdistro_name, os_name, os_version, update=True):
+     sources_list_dir = get_sources_list_dir()
+     if not os.path.exists(sources_list_dir):
+         raise ValidationFailed("""rosdep database is not initialized, please run:
+-\tsudo rosdep init
++\rosdep init
+ """)
+ 
+     if update:
 diff --git a/src/rosdep2/gbpdistro_support.py b/src/rosdep2/gbpdistro_support.py
 index fd90ae096..9dd76a76a 100644
 --- a/src/rosdep2/gbpdistro_support.py
@@ -58,7 +71,7 @@ index 2f4c1cd1e..72c913061 100644
      def elevate_priv(self, cmd):
          """
 diff --git a/src/rosdep2/main.py b/src/rosdep2/main.py
-index 268fcbdc1..bde2fbf65 100644
+index 268fcbdc1..073dac52e 100644
 --- a/src/rosdep2/main.py
 +++ b/src/rosdep2/main.py
 @@ -153,7 +153,10 @@ def rosdep_main(args=None):
@@ -73,6 +86,29 @@ index 268fcbdc1..bde2fbf65 100644
      except RosdepInternalError as e:
          print("""
  ERROR: Rosdep experienced an internal error.
+@@ -174,7 +177,7 @@ def rosdep_main(args=None):
+         sys.exit(1)
+     except CachePermissionError as e:
+         print(str(e))
+-        print("Try running 'sudo rosdep fix-permissions'")
++        print("Try running 'rosdep fix-permissions'")
+         sys.exit(1)
+     except UnsupportedOs as e:
+         print('Unsupported OS: %s\nSupported OSes are [%s]' % (e.args[0], ', '.join(e.args[1])), file=sys.stderr)
+@@ -212,11 +215,11 @@ def check_for_sources_list_init(sources_cache_dir):
+ 
+     sources_list_dir = get_sources_list_dir()
+     if not os.path.exists(sources_list_dir):
+-        commands.insert(0, 'sudo rosdep init')
++        commands.insert(0, 'rosdep init')
+     else:
+         filelist = [f for f in os.listdir(sources_list_dir) if f.endswith('.list')]
+         if not filelist:
+-            commands.insert(0, 'sudo rosdep init')
++            commands.insert(0, 'rosdep init')
+ 
+     if commands:
+         commands = '\n'.join(['    %s' % c for c in commands])
 @@ -499,9 +502,9 @@ def _package_args_handler(command, parser, options, args):
      if command in ['install', 'check', 'keys'] and options.ignore_src:
          if options.verbose:
@@ -85,12 +121,45 @@ index 268fcbdc1..bde2fbf65 100644
              path = os.path.abspath(path.strip())
              if os.path.exists(path):
                  pkgs = find_catkin_packages_in(path, options.verbose)
+@@ -604,7 +607,7 @@ def command_init(options):
+         print('ERROR: cannot create %s:\n\t%s' % (path, e), file=sys.stderr)
+         return 2
+     except OSError as e:
+-        print("ERROR: cannot create %s:\n\t%s\nPerhaps you need to run 'sudo rosdep init' instead" % (path, e), file=sys.stderr)
++        print("ERROR: cannot create %s:\n\t%s\nPerhaps you need to run 'rosdep init' instead" % (path, e), file=sys.stderr)
+         return 3
+     finally:
+         os.umask(old_umask)
+@@ -626,12 +629,12 @@ def update_error_handler(data_source, exc):
+     warnings.filterwarnings('ignore', category=PreRep137Warning)
+ 
+     if not os.path.exists(sources_list_dir):
+-        print('ERROR: no sources directory exists on the system meaning rosdep has not yet been initialized.\n\nPlease initialize your rosdep with\n\n\tsudo rosdep init\n')
++        print('ERROR: no sources directory exists on the system meaning rosdep has not yet been initialized.\n\nPlease initialize your rosdep with\n\n\trosdep init\n')
+         return 1
+ 
+     filelist = [f for f in os.listdir(sources_list_dir) if f.endswith('.list')]
+     if not filelist:
+-        print('ERROR: no data sources in %s\n\nPlease initialize your rosdep with\n\n\tsudo rosdep init\n' % sources_list_dir, file=sys.stderr)
++        print('ERROR: no data sources in %s\n\nPlease initialize your rosdep with\n\n\trosdep init\n' % sources_list_dir, file=sys.stderr)
+         return 1
+     try:
+         print('reading in sources list data from %s' % (sources_list_dir))
+@@ -639,7 +642,7 @@ def update_error_handler(data_source, exc):
+         try:
+             if os.geteuid() == 0:
+                 print("Warning: running 'rosdep update' as root is not recommended.", file=sys.stderr)
+-                print("  You should run 'sudo rosdep fix-permissions' and invoke 'rosdep update' again without sudo.", file=sys.stderr)
++                print("  You should run 'rosdep fix-permissions' and invoke 'rosdep update' again without sudo.", file=sys.stderr)
+         except AttributeError:
+             # nothing we wanna do under Windows
+             pass
 diff --git a/src/rosdep2/platforms/robostack.py b/src/rosdep2/platforms/robostack.py
 new file mode 100644
-index 000000000..a0f27092e
+index 000000000..eba0b4a4c
 --- /dev/null
 +++ b/src/rosdep2/platforms/robostack.py
-@@ -0,0 +1,100 @@
+@@ -0,0 +1,114 @@
 +# Copyright (c) 2021, Tobias Fischer
 +# All rights reserved.
 +#
@@ -120,6 +189,7 @@ index 000000000..a0f27092e
 +
 +# Author Tobias Fischer/info@tobiasfischer.info
 +import subprocess
++import json
 +
 +from rospkg.os_detect import OS_ROBOSTACK
 +
@@ -149,22 +219,30 @@ index 000000000..a0f27092e
 +
 +
 +def conda_detect(packages):
-+    conda_ret = subprocess.check_output([get_conda_mamba_cmd(), 'list', '-e', '-q']).splitlines()
-+    conda_ret_converted = [s.decode("utf-8") for s in conda_ret]
++    conda_ret = json.loads(subprocess.check_output([get_conda_mamba_cmd(), 'list', '--json']))
++    installed_package_names = [installed_package['name'] for installed_package in conda_ret]
++    installed_package_versions = [installed_package['version'] for installed_package in conda_ret]
 +    ret_list = []
-+    for p in packages:
-+        if p == 'REQUIRE_OPENGL' or p == 'REQUIRE_GL':
-+            ret_list.append(p)
++    for requested_package in packages:
++        if requested_package == 'REQUIRE_OPENGL' or requested_package == 'REQUIRE_GL':
++            ret_list.append(requested_package)
 +            continue
 +
-+        if ' ' in p:
-+            pkg_name = p.split(' ')[0]
-+            pkg_version = p.split(' ')[1]
-+            if any(conda_ret_converted_item.startswith(pkg_name + '=' + pkg_version) for conda_ret_converted_item in conda_ret_converted):
-+                ret_list.append(p)
++        if ' ' in requested_package:
++            pkg_name = requested_package.split(' ')[0]
++            pkg_version = requested_package.split(' ')[1]
++            try:
++                installed_package_idx = installed_package_names.index(pkg_name)
++                if installed_package_versions[installed_package_idx] == pkg_version or installed_package_versions[installed_package_idx].startswith(pkg_version + '.'):
++                    ret_list.append(requested_package)
++            except ValueError:
++                continue
 +        else:
-+            if any(conda_ret_converted_item.startswith(p + '=') for conda_ret_converted_item in conda_ret_converted):
-+                ret_list.append(p)
++            try:
++                installed_package_idx = installed_package_names.index(requested_package)
++                ret_list.append(requested_package)
++            except ValueError:
++                continue
 +    return ret_list
 +
 +
@@ -180,6 +258,11 @@ index 000000000..a0f27092e
 +            return []
 +
 +        base_cmd = [get_conda_mamba_cmd(), 'install']
++
++        channels = ['robostack', 'conda-forge']
++        for channel in channels:
++            base_cmd += ['-c', channel]
++
 +        if not interactive:
 +            base_cmd.append('-y')
 +        if quiet:
@@ -218,7 +301,7 @@ index f0cca1396..8dde39155 100644
          fh.close()
          rd_debug('Executing script below with cwd=%s\n{{{\n%s\n}}}\n' % (path, string_script))
 diff --git a/src/rosdep2/sources_list.py b/src/rosdep2/sources_list.py
-index bfec3a1d0..c0a91a460 100644
+index bfec3a1d0..3a4dc3654 100644
 --- a/src/rosdep2/sources_list.py
 +++ b/src/rosdep2/sources_list.py
 @@ -69,7 +69,7 @@
@@ -230,3 +313,17 @@ index bfec3a1d0..c0a91a460 100644
  
  # seconds to wait before aborting download of rosdep data
  DOWNLOAD_TIMEOUT = 15.0
+@@ -97,12 +97,7 @@ def get_sources_list_dirs(source_list_dir):
+ 
+ def get_sources_list_dir():
+     # base of where we read config files from
+-    # TODO: windows
+-    if 0:
+-        # we can't use etc/ros because environment config does not carry over under sudo
+-        etc_ros = rospkg.get_etc_ros_dir()
+-    else:
+-        etc_ros = '/etc/ros'
++    etc_ros = os.environ.get('ROS_ETC_DIR', '/etc/ros')
+     # compute default system wide sources directory
+     sys_sources_list_dir = os.path.join(etc_ros, 'rosdep', SOURCES_LIST_DIR)
+     sources_list_dirs = get_sources_list_dirs(sys_sources_list_dir)
