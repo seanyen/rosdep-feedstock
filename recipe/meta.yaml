@@ -1,6 +1,6 @@
 {% set name = "rosdep" %}
-{% set version = "0.20.1" %}
-{% set sha256 = "135334cd4719c77cd268904dce012ae8a75c238c5f3d4eb945e7ae2310d54cca" %}
+{% set version = "0.21.0" %}
+{% set sha256 = "36855f69398f6d6973dbdaa8f50204f9d7cbdfecf9fb74df6aae2c0510451a18" %}
 
 package:
   name: {{ name|lower }}
@@ -14,7 +14,7 @@ source:
     - add-robostack.patch
 
 build:
-  number: 3
+  number: 0
   script: {{ PYTHON }} -m pip install . --no-deps -vv
   noarch: python
   entry_points:
